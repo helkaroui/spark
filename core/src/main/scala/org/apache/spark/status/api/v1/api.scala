@@ -42,6 +42,28 @@ case class ApplicationInfo private[spark](
     memoryPerExecutorMB: Option[Int],
     attempts: collection.Seq[ApplicationAttemptInfo])
 
+
+case class ConfigurationInfo private[spark](
+                                             id: String,
+                                             name: String,
+                                             coresGranted: Option[Int],
+                                             maxCores: Option[Int],
+                                             coresPerExecutor: Option[Int],
+                                             memoryPerExecutorMB: Option[Int],
+                                             attempts: collection.Seq[ApplicationAttemptInfo],
+                                             applicationConfigs: ApplicationConfigs,
+                                             customConfigs: Map[String, String],
+                                             sparkProperties: Seq[(String, String)]
+                                         )
+
+case class ApplicationConfigs private[spark](
+                                             totalCores: Option[Int],
+                                             coresPerExecutor: Option[Int],
+                                             memoryPerExecutor: Option[Int],
+                                             totalMemory: Option[Int],
+                                             memoryPerCoreGb: Option[Double]
+                                           )
+
 @JsonIgnoreProperties(
   value = Array("startTimeEpoch", "endTimeEpoch", "lastUpdatedEpoch"),
   allowGetters = true)

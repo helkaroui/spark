@@ -20,8 +20,9 @@ import java.util.{List => JList}
 import javax.ws.rs.{DefaultValue, GET, Produces, QueryParam}
 import javax.ws.rs.core.MediaType
 
+
 @Produces(Array(MediaType.APPLICATION_JSON))
-private[v1] class ApplicationListResource extends ApiRequestContext {
+private[v1] class ConfigurationListResource extends ApiRequestContext {
 
   @GET
   def appList(
@@ -31,7 +32,7 @@ private[v1] class ApplicationListResource extends ApiRequestContext {
       @DefaultValue("2010-01-01") @QueryParam("minEndDate") minEndDate: SimpleDateParam,
       @DefaultValue("3000-01-01") @QueryParam("maxEndDate") maxEndDate: SimpleDateParam,
       @QueryParam("limit") limit: Integer)
-  : Iterator[ApplicationInfo] = {
+  : Iterator[ConfigurationInfo] = {
 
     val numApps = Option(limit).map(_.toInt).getOrElse(Integer.MAX_VALUE)
     val includeCompleted = status.isEmpty || status.contains(ApplicationStatus.COMPLETED)
@@ -46,5 +47,39 @@ private[v1] class ApplicationListResource extends ApiRequestContext {
         isAttemptInRange(attempt, minDate, maxDate, minEndDate, maxEndDate, anyRunning)
       }
     }.take(numApps)
+      .map {
+        app =>
+          withUI(app.id, None) { ui =>
+            val environmentInfo: ApplicationEnvironmentInfo = ui.store.environmentInfo()
+            val appConfigs = ApplicationConfigs(
+              totalCores = Some(1),
+              coresPerExecutor = Some(1),
+              memoryPerExecutor = Some(1),
+              totalMemory = Some(1),
+              memoryPerCoreGb = Some(1)
+            )
+
+            ConfigurationInfo(
+              id = app.id,
+              name = app.name,
+              coresGranted = app.coresGranted,
+              maxCores = app.maxCores,
+              coresPerExecutor = app.coresPerExecutor,
+              memoryPerExecutorMB = app.memoryPerExecutorMB,
+              attempts = app.attempts,
+              applicationConfigs = appConfigs,
+              customConfigs = Map(("custom.runId", "run-0102"), ("custom.gitbranch", "master"),
+                ("custom.owner", "hamza")),
+              sparkProperties = environmentInfo.sparkProperties
+            )
+          }
+      }
+  }
+
+  private def getConfig(envInfo: ApplicationEnvironmentInfo, keyword: String)
+  : Option[String] = {
+    envInfo.sparkProperties
+      .find{case (_, v) => v == keyword }
+      .map(_._2)
   }
 }

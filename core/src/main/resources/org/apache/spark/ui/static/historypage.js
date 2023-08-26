@@ -47,6 +47,13 @@ function getParameterByName(name, searchString) {
   return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
+function getConfigByName(name, configDict) {
+  if(name in configDict){
+    return configDict[name]
+  }
+  return null
+}
+
 function removeColumnByName(columns, columnName) {
   return columns.filter(function(col) {return col.name != columnName})
 }
@@ -57,6 +64,23 @@ function getColumnIndex(columns, columnName) {
       return i;
   }
   return -1;
+}
+
+function renderAppConfigs(appConfig){
+  return `<div>
+    <span onclick="this.parentNode.querySelector('.stage-details').classList.toggle('collapsed')" class="expand-details">
+        +details
+      </span>
+      <div class="stage-details collapsed">
+        <pre>
+          <p>Total cores: ${appConfig["totalCores"]}</p>
+          <p>Cores per executor: ${appConfig["coresPerExecutor"]}</p>
+          <p>Memory per executor: ${appConfig["memoryPerExecutor"]}</p>
+          <p>Total memory: ${appConfig["totalMemory"]}</p>
+          <p>Memory per cores (Gb): ${appConfig["memoryPerCoreGb"]}</p>
+        </pre>
+      </div>
+    </div>`
 }
 
 jQuery.extend( jQuery.fn.dataTableExt.oSort, {
@@ -117,7 +141,7 @@ $(document).ready(function() {
     status: (requestedIncomplete ? "running" : "completed")
   };
 
-  $.getJSON(uiRoot + "/api/v1/applications", appParams, function(response, _ignored_status, _ignored_jqXHR) {
+  $.getJSON(uiRoot + "/api/v1/configurations", appParams, function(response, _ignored_status, _ignored_jqXHR) {
     var array = [];
     var hasMultipleAttempts = false;
     for (var i in response) {
@@ -135,6 +159,8 @@ $(document).ready(function() {
         hasMultipleAttempts = true;
       }
 
+      console.log(app)
+
       // TODO: Replace hasOwnProperty with prototype.hasOwnProperty after we find it's safe to do.
       /* eslint-disable no-prototype-builtins */
       for (var j in app["attempts"]) {
@@ -151,6 +177,11 @@ $(document).ready(function() {
         attempt["version"] = version;
         attempt["attemptUrl"] = uiRoot + "/history/" + id + "/" +
           (attempt.hasOwnProperty("attemptId") ? attempt["attemptId"] + "/" : "") + "jobs/";
+        attempt["kibanaUrl"] = "https://google.com";
+        attempt["runId"] = getConfigByName("custom.runId", app["customConfigs"]);
+        attempt["gitbranch"] = getConfigByName("custom.gitbranch", app["customConfigs"]);
+        attempt["owner"] = getConfigByName("custom.owner", app["customConfigs"]);
+        attempt["applicationConfigs"] = app["applicationConfigs"];
         array.push(attempt);
       }
       /* eslint-enable no-prototype-builtins */
@@ -193,12 +224,24 @@ $(document).ready(function() {
           {name: startedColumnName, data: 'startTime' },
           {name: completedColumnName, data: 'endTime' },
           {name: durationColumnName, type: "title-numeric", data: 'duration' },
-          {name: 'user', data: 'sparkUser' },
+          {name: 'runId', data: 'runId' },
+          {name: 'gitbranch', data: 'gitbranch' },
+          {name: 'owner', data: 'owner' },
+          {
+            name: 'applicationConfigs',
+            data: 'applicationConfigs',
+            render: (conf, _ignored_type, _ignored_row) => renderAppConfigs(conf)
+          },
           {name: 'lastUpdated', data: 'lastUpdated' },
           {
             name: 'eventLog',
             data: 'log',
             render: (log, _ignored_type, _ignored_row) => `<a href="${log}" class="btn btn-info btn-mini">Download</a>`
+          },
+          {
+            name: 'kibanaLog',
+            data: 'kibanaUrl',
+            render: (url, _ignored_type, _ignored_row) => `<a href="${url}" class="btn btn-info btn-mini">Show</a>`
           },
         ],
         "aoColumnDefs": [

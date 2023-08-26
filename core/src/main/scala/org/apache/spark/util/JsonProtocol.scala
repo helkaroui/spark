@@ -1039,7 +1039,7 @@ private[spark] object JsonProtocol extends JsonUtils {
   }
 
   def applicationEndFromJson(json: JsonNode): SparkListenerApplicationEnd = {
-    SparkListenerApplicationEnd(json.get("Timestamp").extractLong)
+    SparkListenerApplicationEnd(json.get("Timestamp").extractLong, "FINISHED")
   }
 
   def executorAddedFromJson(json: JsonNode): SparkListenerExecutorAdded = {

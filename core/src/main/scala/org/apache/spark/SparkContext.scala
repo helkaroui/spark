@@ -2770,7 +2770,11 @@ class SparkContext(config: SparkConf) extends Logging {
 
   /** Post the application end event */
   private def postApplicationEnd(): Unit = {
-    listenerBus.post(SparkListenerApplicationEnd(System.currentTimeMillis))
+    // TODO Add app status to log events
+    // scalastyle:off println
+    println(this.statusStore.store.toString)
+    // scalastyle:on println
+    listenerBus.post(SparkListenerApplicationEnd(System.currentTimeMillis, "STOPPED"))
   }
 
   /** Post the environment update event once the task scheduler is ready */

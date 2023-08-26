@@ -289,7 +289,7 @@ case class SparkListenerApplicationStart(
     driverAttributes: Option[Map[String, String]] = None) extends SparkListenerEvent
 
 @DeveloperApi
-case class SparkListenerApplicationEnd(time: Long) extends SparkListenerEvent
+case class SparkListenerApplicationEnd(time: Long, status: String) extends SparkListenerEvent
 
 /**
  * An internal class that describes the metadata of an event log.

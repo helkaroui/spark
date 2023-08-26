@@ -49,6 +49,9 @@ private[v1] class ApiRootResource extends ApiRequestContext {
   @Path("applications/{appId}")
   def application(): Class[OneApplicationResource] = classOf[OneApplicationResource]
 
+  @Path("configurations")
+  def configurationList(): Class[ConfigurationListResource] = classOf[ConfigurationListResource]
+
   @GET
   @Path("version")
   def version(): VersionInfo = new VersionInfo(org.apache.spark.SPARK_VERSION)
@@ -121,6 +124,40 @@ private[v1] trait ApiRequestContext {
 
   def uiRoot: UIRoot = UIRootFromServletContext.getUiRoot(servletContext)
 
+
+  protected def withUI[T](appId: String, attemptId: Option[String])(fn: SparkUI => T): T = {
+    try {
+      uiRoot.withSparkUI(appId, attemptId) { ui =>
+        val user = httpRequest.getRemoteUser()
+        if (!ui.securityManager.checkUIViewPermissions(user)) {
+          throw new ForbiddenException(raw"""user "$user" is not authorized""")
+        }
+        fn(ui)
+      }
+    } catch {
+      case _: NoSuchElementException =>
+        val appKey = attemptId.map(appId + "/" + _).getOrElse(appId)
+        throw new NotFoundException(s"no such app: $appKey")
+    }
+  }
+
+  def isAttemptInRange(
+                                attempt: ApplicationAttemptInfo,
+                                minStartDate: SimpleDateParam,
+                                maxStartDate: SimpleDateParam,
+                                minEndDate: SimpleDateParam,
+                                maxEndDate: SimpleDateParam,
+                                anyRunning: Boolean): Boolean = {
+    val startTimeOk = attempt.startTime.getTime >= minStartDate.timestamp &&
+      attempt.startTime.getTime <= maxStartDate.timestamp
+    // If the maxEndDate is in the past, exclude all running apps.
+    val endTimeOkForRunning = anyRunning && (maxEndDate.timestamp > System.currentTimeMillis())
+    val endTimeOkForCompleted = !anyRunning && (attempt.endTime.getTime >= minEndDate.timestamp &&
+      attempt.endTime.getTime <= maxEndDate.timestamp)
+    val endTimeOk = endTimeOkForRunning || endTimeOkForCompleted
+    startTimeOk && endTimeOk
+  }
+
 }
 
 /**
@@ -132,21 +169,7 @@ private[v1] trait BaseAppResource extends ApiRequestContext {
   @PathParam("appId") protected[this] var appId: String = _
   @PathParam("attemptId") protected[this] var attemptId: String = _
 
-  protected def withUI[T](fn: SparkUI => T): T = {
-    try {
-      uiRoot.withSparkUI(appId, Option(attemptId)) { ui =>
-        val user = httpRequest.getRemoteUser()
-        if (!ui.securityManager.checkUIViewPermissions(user)) {
-          throw new ForbiddenException(raw"""user "$user" is not authorized""")
-        }
-        fn(ui)
-      }
-    } catch {
-      case _: NoSuchElementException =>
-        val appKey = Option(attemptId).map(appId + "/" + _).getOrElse(appId)
-        throw new NotFoundException(s"no such app: $appKey")
-    }
-  }
+  protected def withUI[T](fn: SparkUI => T): T = withUI(appId, Option(attemptId))(fn)
 
   protected def checkUIViewPermissions(): Unit = {
     try {
